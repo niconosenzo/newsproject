@@ -52,6 +52,30 @@ func (a *Article) FormatPublishedDate() string {
 	year, month, day := a.PublishedAt.Date()
 	return fmt.Sprintf("%v %d,%d", month, day, year)
 }
+
+//Page handling
+//IsLastPage checks if we're in the last page
+func (s *Search) IsLastPage() bool {
+	return s.NextPage >= s.TotalPages
+}
+
+//CurrentPage returns current page #
+func (s *Search) CurrentPage() int {
+	if s.NextPage == 1 {
+		return s.NextPage
+	}
+
+	return s.NextPage - 1
+}
+
+//PreviousPage returns prev page
+func (s *Search) PreviousPage() int {
+	return s.CurrentPage() - 1
+}
+
+////
+
+//Handle request
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	tpl.Execute(w, nil)
 }
@@ -70,7 +94,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	if page == "" {
 		page = "1"
 	}
-	//////////
+
 	search := &Search{}
 	search.SearchKey = searchKey
 
@@ -93,7 +117,14 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		w.WriteHeader(http.StatusInternalServerError)
+		newError := &NewsAPIError{}
+		err := json.NewDecoder(resp.Body).Decode(newError)
+		if err != nil {
+			http.Error(w, "Unexpected server error", http.StatusInternalServerError)
+			return
+		}
+
+		http.Error(w, newError.Message, http.StatusInternalServerError)
 		return
 	}
 
@@ -104,11 +135,24 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	search.TotalPages = int(math.Ceil(float64(search.Results.TotalResults / pageSize)))
+
+	// Increment page it's not last
+	if ok := !search.IsLastPage(); ok {
+		search.NextPage++
+	}
+
 	err = tpl.Execute(w, search)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
+}
+
+//NewsAPIError handle 500 requests
+type NewsAPIError struct {
+	Status  string `json:"status"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
 func main() {
