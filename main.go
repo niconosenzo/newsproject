@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"time"
+	//	"github.com/gorilla/mux"
 )
 
 var tpl = template.Must(template.ParseFiles("index.html"))
@@ -81,13 +82,17 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func searchHandler(w http.ResponseWriter, r *http.Request) {
+	// vars := mux.Vars(r)
+
+	// searchKey := vars["q"]
+	// page := vars["page"]
+
 	u, err := url.Parse(r.URL.String())
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Internal server error"))
 		return
 	}
-
 	params := u.Query()
 	searchKey := params.Get("q")
 	page := params.Get("page")
@@ -171,11 +176,10 @@ func main() {
 
 	mux := http.NewServeMux()
 	fs := http.FileServer(http.Dir("assets"))
-	//create the handlers for each route path
-	mux.Handle("/assets/", http.StripPrefix("/assets/", fs)) //static files
+	mux.Handle("/resources/", http.StripPrefix("/resources/", fs)) //static files
 	mux.HandleFunc("/", indexHandler)
 	mux.HandleFunc("/search", searchHandler)
 
 	// start the listener service
-	http.ListenAndServe(":"+port, mux)
+	log.Fatal(http.ListenAndServe(":"+port, mux))
 }
